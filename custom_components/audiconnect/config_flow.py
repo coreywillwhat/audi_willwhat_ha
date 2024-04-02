@@ -9,8 +9,8 @@ from homeassistant.const import (
     CONF_REGION,
     CONF_SCAN_INTERVAL,
 )
-from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.core import callback
 
 from .audi_connect_account import AudiConnectAccount
 from .const import DOMAIN, CONF_SPIN, DEFAULT_UPDATE_INTERVAL, MIN_UPDATE_INTERVAL
