@@ -18,7 +18,7 @@
           "username": "Username",
           "spin": "S-PIN",
           "region": "Region",
-          "scan_interval": "Scan Interval (minutes)"
+          "scan_interval": "Scan interval"
         },
         "title": "Audi Connect Account Info"
       }
@@ -28,9 +28,12 @@
     "step": {
       "init": {
         "data": {
-          "scan_interval": "Scan Interval (minutes)"
+          "scan_interval": "Scan Interval"
         },
-        "title": "Audi Connect Options"
+        "title": "Audi Connect Options",
+        "data_description": {
+          "scan_interval": "(Minutes) Restart required for new scan interval to take effect."
+        }
       }
     }
   },
