@@ -1,5 +1,4 @@
 import logging
-from datetime import timedelta
 import voluptuous as vol
 
 from homeassistant.helpers import config_validation as cv, device_registry as dr
