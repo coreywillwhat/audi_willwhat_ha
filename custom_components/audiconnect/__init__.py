@@ -156,6 +156,8 @@ async def async_setup_entry(hass, config_entry):
     else:
         _LOGGER.info("Skipping initial cloud update...")
 
+    return True
+
 
 async def async_unload_entry(hass, config_entry):
     account = config_entry.data.get(CONF_USERNAME)
