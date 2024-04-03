@@ -13,7 +13,14 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.core import callback
 
 from .audi_connect_account import AudiConnectAccount
-from .const import DOMAIN, CONF_SPIN, DEFAULT_UPDATE_INTERVAL, MIN_UPDATE_INTERVAL
+from .const import (
+    DOMAIN,
+    CONF_SPIN,
+    DEFAULT_UPDATE_INTERVAL,
+    MIN_UPDATE_INTERVAL,
+    CONF_SCAN_INITIAL,
+    CONF_SCAN_ACTIVE
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -175,6 +182,14 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             step_id="init",
             data_schema=vol.Schema(
                 {
+                    vol.Required(
+                        CONF_SCAN_INITIAL,
+                        default=self.config_entry.options.get(CONF_SCAN_INITIAL, True),
+                    ): bool,
+                    vol.Required(
+                        CONF_SCAN_ACTIVE,
+                        default=self.config_entry.options.get(CONF_SCAN_ACTIVE, True),
+                    ): bool,
                     vol.Optional(
                         CONF_SCAN_INTERVAL, default=current_scan_interval
                     ): vol.All(vol.Coerce(int), vol.Clamp(min=MIN_UPDATE_INTERVAL)),
