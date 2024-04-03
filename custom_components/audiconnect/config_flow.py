@@ -19,7 +19,7 @@ from .const import (
     DEFAULT_UPDATE_INTERVAL,
     MIN_UPDATE_INTERVAL,
     CONF_SCAN_INITIAL,
-    CONF_SCAN_ACTIVE
+    CONF_SCAN_ACTIVE,
 )
 
 _LOGGER = logging.getLogger(__name__)
