@@ -29,6 +29,8 @@ from .const import (
     DOMAIN,
     CONF_REGION,
     CONF_MUTABLE,
+    CONF_SCAN_INITIAL,
+    CONF_SCAN_ACTIVE,
     DEFAULT_UPDATE_INTERVAL,
     MIN_UPDATE_INTERVAL,
     RESOURCES,
@@ -108,6 +110,18 @@ async def async_setup_entry(hass, config_entry):
         )
     )
 
+    # Get Initial Scan Option - Default to True
+    _scan_initial = config_entry.options.get(
+        CONF_SCAN_INITIAL,
+        True
+    )
+
+    # Get Active Scan Option - Default to True
+    _scan_active = config_entry.options.get(
+        CONF_SCAN_ACTIVE,
+        True
+    )
+
     account = config_entry.data.get(CONF_USERNAME)
 
     unit_system = "metric"
@@ -125,15 +139,22 @@ async def async_setup_entry(hass, config_entry):
     # Define a callback function for the timer to update data
     async def update_data(now):
         """Update the data with the latest information."""
-        _LOGGER.info("Running cloud update at set interval...")
+        _LOGGER.info("Scheduled cloud update started...")
         await data.update(utcnow())
 
-    # Schedule the update_data function to be called at the configured interval
-    _LOGGER.info("Scheduling update at every %s interval", scan_interval)
-    async_track_time_interval(hass, update_data, scan_interval)
+    # Schedule the update_data function if option is true
+    if _scan_active:
+        _LOGGER.info("Scheduling cloud update at every %s interval.", scan_interval)
+        async_track_time_interval(hass, update_data, scan_interval)
+    else:
+        _LOGGER.info("Active Polling is turned off...")
 
-    # Initially update the data
-    return await data.update(utcnow())
+    # Initially update the data if option is true
+    if _scan_initial:
+        _LOGGER.info("Requesting initial cloud update...")
+        return await data.update(utcnow())
+    else:
+        _LOGGER.info("Skipping initial cloud update...")
 
 
 async def async_unload_entry(hass, config_entry):
