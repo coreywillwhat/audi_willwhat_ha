@@ -132,7 +132,7 @@ class AudiAccount(AudiConnectObserver):
                 self.config_vehicles.add(cfg_vehicle)
 
                 dashboard = Dashboard(
-                    self.connection, vehicle, unit_system=self.unit_system
+                    self.connection, vehicle, unit_system=self.unit_system,
                 )
 
                 for instrument in (
@@ -180,10 +180,12 @@ class AudiAccount(AudiConnectObserver):
 
     async def update(self, now):
         """Update status from the cloud."""
-        _LOGGER.info("Running update for Audi Connect service at %s", now)
+        _LOGGER.info("Running cloud data update for Audi Connect service")
+        update_successful = True  # Initialize a success flag
+
         if not await self.connection.update(None):
             _LOGGER.warning("Failed to update from Audi Connect service")
-            return False
+            update_successful = False
 
         # Discover new vehicles that have not been added yet
         new_vehicles = [
@@ -191,16 +193,27 @@ class AudiAccount(AudiConnectObserver):
         ]
         if new_vehicles:
             _LOGGER.info("Discovered %d vehicle(s)", len(new_vehicles))
-        self.discover_vehicles(new_vehicles)
+            try:
+                self.discover_vehicles(new_vehicles)
+            except Exception as e:
+                _LOGGER.warning("Failed to discover new vehicles: %s", e)
+                update_successful = False
 
         async_dispatcher_send(self.hass, SIGNAL_STATE_UPDATED)
 
-        for config_vehicle in self.config_vehicles:
-            for instrument in config_vehicle.device_trackers:
-                async_dispatcher_send(self.hass, TRACKER_UPDATE, instrument)
+        try:
+            for config_vehicle in self.config_vehicles:
+                for instrument in config_vehicle.device_trackers:
+                    async_dispatcher_send(self.hass, TRACKER_UPDATE, instrument)
+        except Exception as e:
+            _LOGGER.warning("Failed to update device trackers: %s", e)
+            update_successful = False
 
-        _LOGGER.info("Successfully updated Audi Connect service")
-        return True
+        if update_successful:
+            _LOGGER.info("Cloud Data successfully updated.")
+        else:
+            _LOGGER.warning("Cloud Update completed with warnings or errors")
+        return update_successful
 
     async def execute_vehicle_action(self, service):
         device_id = service.data.get(CONF_VIN).lower()
@@ -233,28 +246,52 @@ class AudiAccount(AudiConnectObserver):
 
     async def start_climate_control(self, service):
         _LOGGER.info("Initiating Start Climate Control Service...")
-        device_id = service.data.get(CONF_VIN).lower()
-        device = dr.async_get(self.hass).async_get(device_id)
-        vin = dict(device.identifiers).get(DOMAIN)
-        # Optional Parameters
-        temp_f = service.data.get(CONF_CLIMATE_TEMP_F, None)
-        temp_c = service.data.get(CONF_CLIMATE_TEMP_C, None)
-        glass_heating = service.data.get(CONF_CLIMATE_GLASS, False)
-        seat_fl = service.data.get(CONF_CLIMATE_SEAT_FL, False)
-        seat_fr = service.data.get(CONF_CLIMATE_SEAT_FR, False)
-        seat_rl = service.data.get(CONF_CLIMATE_SEAT_RL, False)
-        seat_rr = service.data.get(CONF_CLIMATE_SEAT_RR, False)
 
-        await self.connection.start_climate_control(
-            vin,
-            temp_f,
-            temp_c,
-            glass_heating,
-            seat_fl,
-            seat_fr,
-            seat_rl,
-            seat_rr,
-        )
+        try:
+            device_id = service.data.get(CONF_VIN).lower()
+            device = dr.async_get(self.hass).async_get(device_id)
+            if device is None:
+                _LOGGER.warning("Device with ID %s not found.", device_id)
+                return
+
+            vin = dict(device.identifiers).get(DOMAIN)
+            if not vin:
+                _LOGGER.warning("VIN for device ID %s not found.", device_id)
+                return
+
+            # Optional Parameters
+            temp_f = service.data.get(CONF_CLIMATE_TEMP_F, None)
+            temp_c = service.data.get(CONF_CLIMATE_TEMP_C, None)
+            glass_heating = service.data.get(CONF_CLIMATE_GLASS, False)
+            seat_fl = service.data.get(CONF_CLIMATE_SEAT_FL, False)
+            seat_fr = service.data.get(CONF_CLIMATE_SEAT_FR, False)
+            seat_rl = service.data.get(CONF_CLIMATE_SEAT_RL, False)
+            seat_rr = service.data.get(CONF_CLIMATE_SEAT_RR, False)
+
+            _LOGGER.debug(
+                "Starting climate control for VIN %s with parameters - Temp (F): %s, Temp (C): %s, "
+                "Glass Heating: %s, Seat FL: %s, Seat FR: %s, Seat RL: %s, Seat RR: %s",
+                vin, temp_f, temp_c, glass_heating, seat_fl, seat_fr, seat_rl, seat_rr
+            )
+
+            await self.connection.start_climate_control(
+                vin,
+                temp_f,
+                temp_c,
+                glass_heating,
+                seat_fl,
+                seat_fr,
+                seat_rl,
+                seat_rr,
+            )
+
+            _LOGGER.info("Climate control started successfully for VIN %s", vin)
+
+        except Exception as e:
+            _LOGGER.error(
+                "Failed to start climate control for VIN %s due to an error: %s", vin, e
+            )
+            raise
 
     async def handle_notification(self, vin: str, action: str) -> None:
         await self._refresh_vehicle_data(vin)
