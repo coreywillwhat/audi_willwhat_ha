@@ -186,16 +186,23 @@ class AudiService:
             "vehicleHealthWarnings",
             "vehicleLights",
         }
-        self._api.use_token(self._bearer_token_json)
-        data = await self._api.get(
-            "https://{region}.bff.cariad.digital/vehicle/v1/vehicles/{vin}/selectivestatus?jobs={jobs}".format(
-                region="emea" if self._country.upper() != "US" else "na",
-                vin=vin.upper(),
-                jobs=",".join(JOBS2QUERY),
+
+        _LOGGER.debug("Attempting to get stored vehicle data for VIN: %s", vin)
+        try:
+            self._api.use_token(self._bearer_token_json)
+            data = await self._api.get(
+                "https://{region}.bff.cariad.digital/vehicle/v1/vehicles/{vin}/selectivestatus?jobs={jobs}".format(
+                    region="emea" if self._country.upper() != "US" else "na",
+                    vin=vin.upper(),
+                    jobs=",".join(JOBS2QUERY),
+                )
             )
-        )
-        _LOGGER.debug(f"{DOMAIN} - Car Data: {data}")
-        return VehicleDataResponse(data)
+            _LOGGER.debug(f"{DOMAIN} - Car Data for VIN: {vin}: {data}")
+            return VehicleDataResponse(data)
+        except Exception as e:
+            _LOGGER.error("Failed to get stored vehicle data for VIN: %s. Error: %s", vin, e)
+            raise e
+
 
     async def get_charger(self, vin: str):
         self._api.use_token(self.vwToken)
@@ -624,33 +631,39 @@ class AudiService:
         data = json.dumps(data)
 
         headers = self._get_vehicle_action_header("application/json", None)
-        res = await self._api.request(
-            "POST",
-            "{homeRegion}/fs-car/bs/climatisation/v1/{type}/{country}/vehicles/{vin}/climater/actions".format(
+
+        try:
+            res = await self._api.request(
+                "POST",
+                "{homeRegion}/fs-car/bs/climatisation/v1/{type}/{country}/vehicles/{vin}/climater/actions".format(
+                    homeRegion=await self._get_home_region(vin.upper()),
+                    type=self._type,
+                    country=self._country,
+                    vin=vin.upper(),
+                ),
+                headers=headers,
+                data=data,
+            )
+
+            checkUrl = "{homeRegion}/fs-car/bs/climatisation/v1/{type}/{country}/vehicles/{vin}/climater/actions/{actionid}".format(
                 homeRegion=await self._get_home_region(vin.upper()),
                 type=self._type,
                 country=self._country,
                 vin=vin.upper(),
-            ),
-            headers=headers,
-            data=data,
-        )
+                actionid=res["action"]["actionId"],
+            )
 
-        checkUrl = "{homeRegion}/fs-car/bs/climatisation/v1/{type}/{country}/vehicles/{vin}/climater/actions/{actionid}".format(
-            homeRegion=await self._get_home_region(vin.upper()),
-            type=self._type,
-            country=self._country,
-            vin=vin.upper(),
-            actionid=res["action"]["actionId"],
-        )
+            await self.check_request_succeeded(
+                checkUrl,
+                "start climatisation",
+                SUCCEEDED,
+                FAILED,
+                "action.actionState",
+            )
+        except Exception as e:
+            _LOGGER.error(f"Failed to send climate control request for {vin}. Error: {e}")
+            raise  # Ensure exceptions propagate up
 
-        await self.check_request_succeeded(
-            checkUrl,
-            "start climatisation",
-            SUCCEEDED,
-            FAILED,
-            "action.actionState",
-        )
 
     async def set_window_heating(self, vin: str, start: bool):
         data = '<?xml version="1.0" encoding= "UTF-8" ?><action><type>{action}</type></action>'.format(
