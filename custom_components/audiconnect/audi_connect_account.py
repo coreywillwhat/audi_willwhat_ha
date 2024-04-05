@@ -1,5 +1,5 @@
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import logging
 import asyncio
 from typing import List
@@ -87,60 +87,86 @@ class AudiConnectAccount:
             return False
 
     async def update(self, vinlist):
+        _LOGGER.debug("Starting update process for vinlist: %s", vinlist)
+
         if not self._loggedin:
+            _LOGGER.info("Not logged in, attempting to login.")
             await self.login()
 
         if not self._loggedin:
+            _LOGGER.warning("Login failed, aborting update.")
             return False
 
-        #
+        _LOGGER.info("Successfully logged in, proceeding with update.")
+
         elapsed_sec = time.time() - self._logintime
         if await self._audi_service.refresh_token_if_necessary(elapsed_sec):
             # Store current timestamp when refresh was performed and successful
             self._logintime = time.time()
+            _LOGGER.info("Token refreshed successfully.")
 
-        """Update the state of all vehicles."""
         try:
             if len(self._audi_vehicles) > 0:
+                _LOGGER.debug("Updating existing vehicles.")
                 for vehicle in self._audi_vehicles:
+                    _LOGGER.debug("Updating vehicle with VIN: %s", vehicle.vin)
                     await self.add_or_update_vehicle(vehicle, vinlist)
-
             else:
+                _LOGGER.debug("Fetching vehicle information from service.")
                 vehicles_response = await self._audi_service.get_vehicle_information()
                 self._audi_vehicles = vehicles_response.vehicles
+                _LOGGER.info("Fetched %d vehicles from service.", len(self._audi_vehicles))
                 self._vehicles = []
                 for vehicle in self._audi_vehicles:
+                    _LOGGER.debug("Adding new vehicle with VIN: %s", vehicle.vin)
                     await self.add_or_update_vehicle(vehicle, vinlist)
 
             for listener in self._update_listeners:
+                _LOGGER.debug("Notifying listener.")
                 listener()
 
-            # TR/2021-12-01: do not set to False as refresh_token is used
-            # self._loggedin = False
-
+            _LOGGER.info("Update process completed successfully.")
             return True
 
         except OSError as exception:
             # Force a re-login in case of failure/exception
             self._loggedin = False
-            _LOGGER.exception(exception)
+            _LOGGER.error("Encountered OSError during update, forcing re-login.", exc_info=exception)
             return False
+
 
     async def add_or_update_vehicle(self, vehicle, vinlist):
         if vehicle.vin is not None:
+            _LOGGER.debug("Processing vehicle with VIN: %s", vehicle.vin)
             if vinlist is None or vehicle.vin.lower() in vinlist:
+                _LOGGER.debug("Vehicle VIN %s is in the target list or list is None, proceeding.", vehicle.vin)
                 vupd = [x for x in self._vehicles if x.vin == vehicle.vin.lower()]
                 if len(vupd) > 0:
-                    if await vupd[0].update() is False:
+                    _LOGGER.info("Vehicle with VIN %s already exists, updating.", vehicle.vin)
+                    update_success = await vupd[0].update()
+                    if update_success is False:
+                        _LOGGER.warning("Updating vehicle with VIN %s failed, marking as logged out.", vehicle.vin)
                         self._loggedin = False
+                    else:
+                        _LOGGER.debug("Vehicle with VIN %s updated successfully.", vehicle.vin)
                 else:
                     try:
+                        _LOGGER.info("Adding new vehicle with VIN %s.", vehicle.vin)
                         audiVehicle = AudiConnectVehicle(self._audi_service, vehicle)
-                        if await audiVehicle.update() is False:
+                        update_success = await audiVehicle.update()
+                        if update_success is False:
+                            _LOGGER.warning("Initial update for new vehicle with VIN %s failed, marking as logged out.", vehicle.vin)
                             self._loggedin = False
-                        self._vehicles.append(audiVehicle)
-                    except Exception:
-                        pass
+                        else:
+                            self._vehicles.append(audiVehicle)
+                            _LOGGER.debug("New vehicle with VIN %s added and updated successfully.", vehicle.vin)
+                    except Exception as e:
+                        _LOGGER.error("Exception occurred while adding or updating a vehicle with VIN %s: %s", vehicle.vin, str(e))
+            else:
+                _LOGGER.debug("Vehicle VIN %s is not in the target list, skipping.", vehicle.vin)
+        else:
+            _LOGGER.warning("Encountered vehicle without a VIN, skipping.")
+
 
     async def refresh_vehicle_data(self, vin: str):
         if not self._loggedin:
@@ -252,13 +278,13 @@ class AudiConnectAccount:
             await self.login()
 
         if not self._loggedin:
-            return False
+            _LOGGER.error(f"Failed to log in for starting climate control of vehicle {vin}")
+            raise Exception("Login failed")
 
         try:
             _LOGGER.debug(
-                f"Sending command to start climate control for vehicle {vin} with settings - Temp(F): {temp_f}, Temp(C): {temp_c}, Glass Heating: {glass_heating}, Seat FL: {seat_fl}, Seat FR: {seat_fr}, Seat RL: {seat_rl}, Seat RR: {seat_rr}"
+                f"Sending command to start climate control for vehicle {vin}..."
             )
-
             await self._audi_service.start_climate_control(
                 vin,
                 temp_f,
@@ -269,19 +295,15 @@ class AudiConnectAccount:
                 seat_rl,
                 seat_rr,
             )
-
             _LOGGER.debug(f"Successfully started climate control of vehicle {vin}")
 
             await self.notify(vin, ACTION_CLIMATISATION)
 
             return True
-
+            
         except Exception as exception:
-            _LOGGER.error(
-                f"Unable to start climate control of vehicle {vin}. Error: {exception}",
-                exc_info=True,
-            )
-            return False
+            _LOGGER.error(f"Unable to start climate control of vehicle {vin}. Error: {exception}")
+            raise
 
     async def set_battery_charger(self, vin: str, activate: bool, timer: bool):
         if not self._loggedin:
@@ -477,14 +499,17 @@ class AudiConnectVehicle:
 
     async def update_vehicle_statusreport(self):
         if not self.support_status_report:
+            _LOGGER.info("Status report not supported for vehicle with VIN: %s", self._vehicle.vin)
             return
 
         try:
+            _LOGGER.debug("Attempting to get stored vehicle data for VIN: %s", self._vehicle.vin)
             status = await self._audi_service.get_stored_vehicle_data(self._vehicle.vin)
             self._vehicle.fields = {
                 status.data_fields[i].name: status.data_fields[i].value
                 for i in range(0, len(status.data_fields))
             }
+            _LOGGER.info("Successfully updated vehicle fields for VIN: %s", self._vehicle.vin)
 
             # last_update_time should be newest carCapturedTimestamp of all fields and states
             self._vehicle.state["last_update_time"] = datetime(
@@ -500,15 +525,13 @@ class AudiConnectVehicle:
                 )
             for state in status.states:
                 self._vehicle.state[state["name"]] = state["value"]
-        except TimeoutError:
-            raise
+            _LOGGER.info("Vehicle status report updated for VIN: %s", self._vehicle.vin)
+        except TimeoutError as timeout_exception:
+            _LOGGER.error("Timeout error while updating vehicle status report for VIN: %s", self._vehicle.vin)
+            raise timeout_exception
         except ClientResponseError as resp_exception:
-            if resp_exception.status == 403 or resp_exception.status == 502:
-                # _LOGGER.error(
-                #    "support_status_report set to False: {status}".format(
-                #        status=resp_exception.status
-                #    )
-                # )
+            if resp_exception.status in [403, 502]:
+                _LOGGER.error("Access denied or bad gateway when updating status report for VIN: %s. Error: %s", self._vehicle.vin, resp_exception)
                 self.support_status_report = False
             else:
                 self.log_exception_once(
@@ -520,10 +543,12 @@ class AudiConnectVehicle:
         except Exception as exception:
             self.log_exception_once(
                 exception,
-                "Unable to obtain the vehicle status report of {}".format(
+                "Unknown error occurred while obtaining the vehicle status report of {}".format(
                     self._vehicle.vin
                 ),
             )
+            _LOGGER.exception("An unexpected error occurred for VIN: %s", self._vehicle.vin)
+
 
     async def update_vehicle_position(self):
         if not self.support_position:
@@ -1443,6 +1468,21 @@ class AudiConnectVehicle:
         check = self._vehicle.state.get("remainingChargingTime")
         if check is not None:
             return True
+
+    @property
+    def charging_complete_time(self):
+        """Return the datetime when charging is expected to be complete."""
+        if self.remaining_charging_time_supported:
+            remaining_minutes = self._vehicle.state.get("remainingChargingTime")
+            
+            if self.last_update_time is None or remaining_minutes is None or remaining_minutes is 0:
+                return None
+            
+            charging_complete_time = self.last_update_time + timedelta(minutes=remaining_minutes)
+            
+            return charging_complete_time
+        else:
+            return None
 
     @property
     def plug_state(self):

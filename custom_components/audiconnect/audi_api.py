@@ -45,11 +45,13 @@ class AudiAPI:
         rsp_wtxt: bool = False,
         **kwargs,
     ):
+        _LOGGER.debug("Starting request to URL: %s with method: %s", url, method)
         try:
             with async_timeout.timeout(TIMEOUT):
                 async with self._session.request(
                     method, url, headers=headers, data=data, **kwargs
                 ) as response:
+                    _LOGGER.debug("Received response from URL: %s with status: %s", url, response.status)
                     if raw_reply:
                         return response
                     if rsp_wtxt:
@@ -57,13 +59,10 @@ class AudiAPI:
                         return response, txt
                     elif raw_contents:
                         return await response.read()
-                    elif (
-                        response.status == 200
-                        or response.status == 202
-                        or response.status == 207
-                    ):
+                    elif response.status in [200, 202, 207]:
                         return await response.json(loads=json_loads)
                     else:
+                        _LOGGER.error("Error response %s from URL: %s", response.status, url)
                         raise ClientResponseError(
                             response.request_info,
                             response.history,
@@ -71,26 +70,35 @@ class AudiAPI:
                             message=response.reason,
                         )
         except CancelledError:
+            _LOGGER.error("Request cancelled during execution to URL: %s", url)
             raise TimeoutError("Timeout error")
         except TimeoutError:
+            _LOGGER.error("Timeout error during request to URL: %s", url)
             raise TimeoutError("Timeout error")
-        except Exception:
+        except Exception as e:
+            _LOGGER.exception("Unexpected error during request to URL: %s. Error: %s", url, e)
             raise
 
-    async def get(
-        self, url, raw_reply: bool = False, raw_contents: bool = False, **kwargs
-    ):
-        full_headers = self.__get_headers()
-        r = await self.request(
-            METH_GET,
-            url,
-            data=None,
-            headers=full_headers,
-            raw_reply=raw_reply,
-            raw_contents=raw_contents,
-            **kwargs,
-        )
-        return r
+
+    async def get(self, url, raw_reply: bool = False, raw_contents: bool = False, **kwargs):
+        _LOGGER.debug("Initiating GET request to URL: %s", url)
+        try:
+            full_headers = self.__get_headers()
+            r = await self.request(
+                METH_GET,
+                url,
+                data=None,
+                headers=full_headers,
+                raw_reply=raw_reply,
+                raw_contents=raw_contents,
+                **kwargs,
+            )
+            _LOGGER.debug("GET request to URL: %s completed successfully", url)
+            return r
+        except Exception as e:
+            _LOGGER.error("Error during GET request to URL: %s. Error: %s", url, e)
+            raise
+
 
     async def put(self, url, data=None, headers: Dict[str, str] = None):
         full_headers = self.__get_headers()
