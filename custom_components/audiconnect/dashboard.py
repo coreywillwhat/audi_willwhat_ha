@@ -413,6 +413,26 @@ class LastUpdate(Instrument):
         return super().state
 
 
+class ClimateControl(Instrument):
+    def __init__(self):
+        super().__init__(
+            component="binary_sensor",
+            attr="climatisation_state",
+            name="Climate Control",
+            icon="mdi:air-conditioner",
+        )
+        self.device_class = BinarySensorDeviceClass.RUNNING
+        self.entity_category = None
+
+    @property
+    def is_on(self):
+        return self.state == "heating" or self.state == "cooling"
+
+    @property
+    def extra_state_attributes(self):
+        data = super().state
+
+
 def create_instruments():
     return [
         Position(),
