@@ -1,5 +1,5 @@
 ---
-# Describes the format for available services for audiconnect
+# Describes the format for available services for myaudi
 
 refresh_vehicle_data:
   fields:

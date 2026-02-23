@@ -1,8 +1,8 @@
-"""Support for Audi Connect binary sensors."""
+"""Support for myAudi switches."""
 
 from __future__ import annotations
 
-from homeassistant.components.binary_sensor import BinarySensorEntity
+from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -18,22 +18,22 @@ async def async_setup_entry(
 ) -> None:
     runtime_data: AudiRuntimeData = config_entry.runtime_data
     entities = [
-        AudiBinarySensor(runtime_data.coordinator, sensor)
+        AudiSwitch(runtime_data.coordinator, switch)
         for config_vehicle in runtime_data.account.config_vehicles
-        for sensor in config_vehicle.binary_sensors
+        for switch in config_vehicle.switches
     ]
     async_add_entities(entities)
 
 
-class AudiBinarySensor(AudiEntity, BinarySensorEntity):
+class AudiSwitch(AudiEntity, SwitchEntity):
     @property
     def is_on(self):
-        return self._instrument.is_on
+        return self._instrument.state
 
-    @property
-    def device_class(self):
-        return self._instrument.device_class
+    async def async_turn_on(self, **kwargs):
+        await self._instrument.turn_on()
+        await self.coordinator.async_request_refresh()
 
-    @property
-    def entity_category(self):
-        return self._instrument.entity_category
+    async def async_turn_off(self, **kwargs):
+        await self._instrument.turn_off()
+        await self.coordinator.async_request_refresh()

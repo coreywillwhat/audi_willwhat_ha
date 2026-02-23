@@ -1,8 +1,8 @@
-"""Support for Audi Connect sensors."""
+"""Support for myAudi binary sensors."""
 
 from __future__ import annotations
 
-from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -18,40 +18,22 @@ async def async_setup_entry(
 ) -> None:
     runtime_data: AudiRuntimeData = config_entry.runtime_data
     entities = [
-        AudiSensor(runtime_data.coordinator, sensor)
+        AudiBinarySensor(runtime_data.coordinator, sensor)
         for config_vehicle in runtime_data.account.config_vehicles
-        for sensor in config_vehicle.sensors
+        for sensor in config_vehicle.binary_sensors
     ]
     async_add_entities(entities)
 
 
-class AudiSensor(AudiEntity, SensorEntity):
-    """Representation of an Audi sensor."""
-
+class AudiBinarySensor(AudiEntity, BinarySensorEntity):
     @property
-    def native_value(self):
-        return self._instrument.state
-
-    @property
-    def native_unit_of_measurement(self):
-        return self._instrument.unit
+    def is_on(self):
+        return self._instrument.is_on
 
     @property
     def device_class(self):
         return self._instrument.device_class
 
     @property
-    def state_class(self):
-        return self._instrument.state_class
-
-    @property
     def entity_category(self):
         return self._instrument.entity_category
-
-    @property
-    def extra_state_attributes(self):
-        return self._instrument.extra_state_attributes
-
-    @property
-    def suggested_display_precision(self):
-        return self._instrument.suggested_display_precision

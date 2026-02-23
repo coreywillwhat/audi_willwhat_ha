@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, Platform
 
-DOMAIN = "audiconnect"
+DOMAIN = "myaudi"
 
 CONF_VIN = "vin"
 CONF_CARNAME = "carname"

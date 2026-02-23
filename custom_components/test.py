@@ -2,8 +2,8 @@ import sys
 import asyncio
 import getopt
 
-from audiconnect.audi_connect_account import AudiConnectAccount
-from audiconnect.dashboard import Dashboard
+from myaudi.audi_connect_account import AudiConnectAccount
+from myaudi.dashboard import Dashboard
 
 from aiohttp import ClientSession
 
