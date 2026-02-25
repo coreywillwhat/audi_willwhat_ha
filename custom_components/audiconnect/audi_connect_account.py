@@ -13,6 +13,7 @@ from aiohttp import ClientResponseError, ClientSession
 
 from .audi_api import AudiAPI
 from .audi_services import AudiService
+from .exceptions import AudiAuthError
 from .util import get_attr, log_exception, parse_datetime, parse_float, parse_int
 
 _LOGGER = logging.getLogger(__name__)
@@ -98,10 +99,12 @@ class AudiConnectAccount:
             await self._audi_service.login(self._username, self._password, False)
             _LOGGER.debug("LOGIN: Login to Audi service successful")
             return True
+        except AudiAuthError:
+            raise
         except Exception as exception:
             if logError is True:
                 _LOGGER.error(
-                    "LOGIN: Failed to log in to the Audi service: %s."
+                    "LOGIN: Failed to log in to the Audi service: %s. "
                     "You may need to open the myAudi app, or log in via a web browser, to accept updated terms and conditions.",
                     str(exception),
                 )

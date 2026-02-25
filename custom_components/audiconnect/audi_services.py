@@ -23,6 +23,7 @@ from .audi_models import (
     VehiclesResponse,
 )
 from .const import DEFAULT_API_LEVEL
+from .exceptions import AudiAuthError
 from .util import get_attr, to_byte_array
 
 
@@ -1256,6 +1257,14 @@ class AudiService:
             allow_redirects=False,
             rsp_wtxt=True,
         )
+
+        # A successful password submission returns a 302 redirect.
+        # If there is no Location header, the credentials were rejected.
+        if "Location" not in pw_rsp.headers:
+            raise AudiAuthError(
+                "Authentication failed: the server did not redirect after "
+                "login — this usually means the credentials are invalid"
+            )
 
         # forward1 after pwd
         fwd1_rsp, fwd1_rsptxt = await self._api.request(

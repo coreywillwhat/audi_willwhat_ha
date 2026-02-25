@@ -2,6 +2,7 @@
   "config": {
     "abort": {
       "invalid_credentials": "Invalid credentials",
+      "reauth_successful": "Reauthentication successful",
       "user_already_configured": "Account has already been configured"
     },
     "create_entry": {},
@@ -24,6 +25,17 @@
         "title": "Audi Connect Account Info",
         "data_description": {
           "api_level": "For Audi vehicles, the API request data structure varies by model. Newer vehicles use an updated data structure compared to older models. Adjusting the API Level ensures that the system automatically applies the correct data structure for each specific vehicle. This can be changed later via the Reconfigure option."
+        }
+      },
+      "reauth_confirm": {
+        "title": "Reauthenticate Audi Connect",
+        "description": "The credentials for **{username}** are no longer valid. Please enter your updated password to restore the connection.",
+        "data": {
+          "password": "Password",
+          "spin": "S-PIN"
+        },
+        "data_description": {
+          "spin": "Optional S-PIN for vehicle actions such as lock/unlock."
         }
       },
       "reconfigure": {

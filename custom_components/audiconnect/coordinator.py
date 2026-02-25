@@ -6,10 +6,12 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .audi_account import AudiAccount
 from .const import CONF_SCAN_INTERVAL, DEFAULT_UPDATE_INTERVAL, DOMAIN
+from .exceptions import AudiAuthError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -38,6 +40,10 @@ class AudiDataUpdateCoordinator(DataUpdateCoordinator[list[Any]]):
     async def _async_update_data(self) -> list[Any]:
         try:
             return await self.account.async_refresh_data()
+        except AudiAuthError as err:
+            raise ConfigEntryAuthFailed(
+                "Authentication failed — please update your Audi Connect credentials"
+            ) from err
         except Exception as err:  # noqa: BLE001
             raise UpdateFailed(str(err)) from err
 
