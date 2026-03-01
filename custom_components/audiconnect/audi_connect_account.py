@@ -1393,6 +1393,23 @@ class AudiConnectVehicle:
             )
 
     @property
+    def any_window_open_attrs(self):
+        attrs = {}
+        if self.left_front_window_open_supported:
+            attrs["left_front_window"] = "Open" if self.left_front_window_open else "Closed"
+        if self.right_front_window_open_supported:
+            attrs["right_front_window"] = "Open" if self.right_front_window_open else "Closed"
+        if self.left_rear_window_open_supported:
+            attrs["left_rear_window"] = "Open" if self.left_rear_window_open else "Closed"
+        if self.right_rear_window_open_supported:
+            attrs["right_rear_window"] = "Open" if self.right_rear_window_open else "Closed"
+        if self.sun_roof_supported:
+            attrs["sun_roof"] = "Open" if self.sun_roof else "Closed"
+        if self.roof_cover_supported:
+            attrs["roof_cover"] = "Open" if self.roof_cover else "Closed"
+        return attrs
+
+    @property
     def left_front_window_open_supported(self):
         return self._vehicle.fields.get("STATE_LEFT_FRONT_WINDOW")
 
@@ -1491,6 +1508,25 @@ class AudiConnectVehicle:
                 and checkRightFront == "3"
                 and checkRightRear == "3"
             )
+
+    @property
+    def any_door_open_attrs(self):
+        attrs = {}
+        if self.left_front_door_open_supported:
+            attrs["left_front_door"] = "Open" if self.left_front_door_open else "Closed"
+        if self.right_front_door_open_supported:
+            attrs["right_front_door"] = "Open" if self.right_front_door_open else "Closed"
+        if self.left_rear_door_open_supported:
+            attrs["left_rear_door"] = "Open" if self.left_rear_door_open else "Closed"
+        if self.right_rear_door_open_supported:
+            attrs["right_rear_door"] = "Open" if self.right_rear_door_open else "Closed"
+        if self.trunk_open_supported:
+            attrs["trunk"] = "Open" if self.trunk_open else "Closed"
+        if self.trunk_unlocked_supported:
+            attrs["trunk_lock"] = "Unlocked" if self.trunk_unlocked else "Locked"
+        if self.hood_open_supported:
+            attrs["hood"] = "Open" if self.hood_open else "Closed"
+        return attrs
 
     @property
     def left_front_door_open_supported(self):

@@ -246,6 +246,40 @@ class BinarySensor(Instrument):
         return self.state
 
 
+class DoorsBinarySensor(BinarySensor):
+    """Consolidated doors binary sensor with per-door attributes."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            attr="any_door_open",
+            name="Doors",
+            device_class=BinarySensorDeviceClass.DOOR,
+        )
+
+    @property
+    def attributes(self) -> dict[str, Any]:
+        if hasattr(self._vehicle, "any_door_open_attrs"):
+            return self._vehicle.any_door_open_attrs
+        return {}
+
+
+class WindowsBinarySensor(BinarySensor):
+    """Consolidated windows binary sensor with per-window attributes."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            attr="any_window_open",
+            name="Windows",
+            device_class=BinarySensorDeviceClass.WINDOW,
+        )
+
+    @property
+    def attributes(self) -> dict[str, Any]:
+        if hasattr(self._vehicle, "any_window_open_attrs"):
+            return self._vehicle.any_window_open_attrs
+        return {}
+
+
 class Lock(Instrument):
     def __init__(self) -> None:
         super().__init__(component="lock", attr="lock", name="Door lock")
@@ -708,100 +742,19 @@ def create_instruments() -> list[Instrument]:
             unit=UnitOfTime.MINUTES,
         ),
         BinarySensor(
-            attr="sun_roof",
-            name="Sun roof",
-            device_class=BinarySensorDeviceClass.WINDOW,
-        ),
-        BinarySensor(
-            attr="roof_cover",
-            name="Roof Cover",
-            device_class=BinarySensorDeviceClass.WINDOW,
-        ),
-        BinarySensor(
             attr="parking_light",
             name="Parking light",
             device_class=BinarySensorDeviceClass.SAFETY,
             icon="mdi:lightbulb",
             entity_category=EntityCategory.DIAGNOSTIC,
         ),
-        BinarySensor(
-            attr="any_window_open",
-            name="Windows",
-            device_class=BinarySensorDeviceClass.WINDOW,
-        ),
+        WindowsBinarySensor(),
         BinarySensor(
             attr="any_door_unlocked",
             name="Doors lock",
             device_class=BinarySensorDeviceClass.LOCK,
         ),
-        BinarySensor(
-            attr="any_door_open",
-            name="Doors",
-            device_class=BinarySensorDeviceClass.DOOR,
-        ),
-        BinarySensor(
-            attr="trunk_unlocked",
-            name="Trunk lock",
-            device_class=BinarySensorDeviceClass.LOCK,
-        ),
-        BinarySensor(
-            attr="trunk_open",
-            name="Trunk",
-            device_class=BinarySensorDeviceClass.DOOR,
-        ),
-        BinarySensor(
-            attr="hood_open",
-            name="Hood",
-            device_class=BinarySensorDeviceClass.DOOR,
-        ),
-        BinarySensor(
-            attr="left_front_door_open",
-            name="Left front door",
-            device_class=BinarySensorDeviceClass.DOOR,
-            entity_category=EntityCategory.DIAGNOSTIC,
-        ),
-        BinarySensor(
-            attr="right_front_door_open",
-            name="Right front door",
-            device_class=BinarySensorDeviceClass.DOOR,
-            entity_category=EntityCategory.DIAGNOSTIC,
-        ),
-        BinarySensor(
-            attr="left_rear_door_open",
-            name="Left rear door",
-            device_class=BinarySensorDeviceClass.DOOR,
-            entity_category=EntityCategory.DIAGNOSTIC,
-        ),
-        BinarySensor(
-            attr="right_rear_door_open",
-            name="Right rear door",
-            device_class=BinarySensorDeviceClass.DOOR,
-            entity_category=EntityCategory.DIAGNOSTIC,
-        ),
-        BinarySensor(
-            attr="left_front_window_open",
-            name="Left front window",
-            device_class=BinarySensorDeviceClass.WINDOW,
-            entity_category=EntityCategory.DIAGNOSTIC,
-        ),
-        BinarySensor(
-            attr="right_front_window_open",
-            name="Right front window",
-            device_class=BinarySensorDeviceClass.WINDOW,
-            entity_category=EntityCategory.DIAGNOSTIC,
-        ),
-        BinarySensor(
-            attr="left_rear_window_open",
-            name="Left rear window",
-            device_class=BinarySensorDeviceClass.WINDOW,
-            entity_category=EntityCategory.DIAGNOSTIC,
-        ),
-        BinarySensor(
-            attr="right_rear_window_open",
-            name="Right rear window",
-            device_class=BinarySensorDeviceClass.WINDOW,
-            entity_category=EntityCategory.DIAGNOSTIC,
-        ),
+        DoorsBinarySensor(),
         BinarySensor(
             attr="braking_status",
             name="Braking status",
@@ -837,6 +790,7 @@ class Dashboard:
 __all__ = [
     "BinarySensor",
     "Dashboard",
+    "DoorsBinarySensor",
     "Instrument",
     "LastUpdate",
     "Lock",
@@ -845,5 +799,6 @@ __all__ = [
     "Sensor",
     "Switch",
     "TripData",
+    "WindowsBinarySensor",
     "create_instruments",
 ]
