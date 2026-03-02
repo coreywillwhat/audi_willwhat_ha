@@ -12,15 +12,37 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import AudiRuntimeData
-from .audi_entity import AudiEntity, is_entity_supported
+from .audi_entity import AudiEntity
 from .coordinator import AudiDataUpdateCoordinator
+
+
+# ---------------------------------------------------------------------------
+# Helper
+# ---------------------------------------------------------------------------
+
+
+def _preheater_active(vehicle: Any) -> bool:
+    """Return True if preheater climatisation state is not 'off'."""
+    ps = vehicle.state.get("preheaterState")
+    if not isinstance(ps, dict):
+        return False
+    report = ps.get("climatisationStateReport")
+    if not isinstance(report, dict):
+        return False
+    return report.get("climatisationState") != "off"
+
+
+# ---------------------------------------------------------------------------
+# Description dataclass
+# ---------------------------------------------------------------------------
 
 
 @dataclass(frozen=True, kw_only=True)
 class AudiSwitchEntityDescription(SwitchEntityDescription):
     """Describes an Audi switch entity."""
 
-    attr_key: str
+    value_fn: Callable[[Any], bool]
+    supported_fn: Callable[[Any], bool]
     turn_on_fn: Callable[[Any, str], Coroutine[Any, Any, None]]
     turn_off_fn: Callable[[Any, str], Coroutine[Any, Any, None]]
 
@@ -28,13 +50,19 @@ class AudiSwitchEntityDescription(SwitchEntityDescription):
 SWITCH_DESCRIPTIONS: tuple[AudiSwitchEntityDescription, ...] = (
     AudiSwitchEntityDescription(
         key="preheater_active",
-        attr_key="preheater_active",
         name="Preheater",
         icon="mdi:radiator",
+        value_fn=_preheater_active,
+        supported_fn=lambda v: v.state.get("preheaterState") is not None,
         turn_on_fn=lambda conn, vin: conn.set_vehicle_pre_heater(vin, True),
         turn_off_fn=lambda conn, vin: conn.set_vehicle_pre_heater(vin, False),
     ),
 )
+
+
+# ---------------------------------------------------------------------------
+# Platform setup
+# ---------------------------------------------------------------------------
 
 
 async def async_setup_entry(
@@ -43,15 +71,20 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     runtime_data: AudiRuntimeData = config_entry.runtime_data
-    entities = [
-        AudiSwitch(runtime_data.coordinator, description, vehicle)
-        for config_vehicle in runtime_data.account.config_vehicles
-        for description in SWITCH_DESCRIPTIONS
-        if is_entity_supported(
-            (vehicle := config_vehicle.vehicle), description.attr_key
-        )
-    ]
+    entities: list[SwitchEntity] = []
+    for config_vehicle in runtime_data.account.config_vehicles:
+        vehicle = config_vehicle.vehicle
+        for description in SWITCH_DESCRIPTIONS:
+            if description.supported_fn(vehicle):
+                entities.append(
+                    AudiSwitch(runtime_data.coordinator, description, vehicle)
+                )
     async_add_entities(entities)
+
+
+# ---------------------------------------------------------------------------
+# Entity class
+# ---------------------------------------------------------------------------
 
 
 class AudiSwitch(AudiEntity, SwitchEntity):
@@ -73,7 +106,7 @@ class AudiSwitch(AudiEntity, SwitchEntity):
 
     @property
     def is_on(self) -> bool:
-        return getattr(self._vehicle, self.entity_description.attr_key, False)
+        return self.entity_description.value_fn(self._vehicle)
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         connection = self.coordinator.account.connection

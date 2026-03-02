@@ -11,10 +11,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import AudiRuntimeData
-from .audi_entity import AudiEntity, is_entity_supported
+from .audi_entity import AudiEntity
 from .coordinator import AudiDataUpdateCoordinator
-
-_POSITION_ATTR_KEY = "position"
 
 
 async def async_setup_entry(
@@ -23,11 +21,11 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     runtime_data: AudiRuntimeData = config_entry.runtime_data
-    entities = [
-        AudiDeviceTracker(runtime_data.coordinator, config_vehicle.vehicle)
-        for config_vehicle in runtime_data.account.config_vehicles
-        if is_entity_supported(config_vehicle.vehicle, _POSITION_ATTR_KEY)
-    ]
+    entities: list[TrackerEntity] = []
+    for config_vehicle in runtime_data.account.config_vehicles:
+        vehicle = config_vehicle.vehicle
+        if vehicle.state.get("position"):
+            entities.append(AudiDeviceTracker(runtime_data.coordinator, vehicle))
     async_add_entities(entities)
 
 
@@ -46,12 +44,12 @@ class AudiDeviceTracker(AudiEntity, TrackerEntity):
     ) -> None:
         super().__init__(coordinator, vehicle)
         self._attr_unique_id = (
-            f"{vehicle.vin.lower()}_device_tracker_{_POSITION_ATTR_KEY}"
+            f"{vehicle.vin.lower()}_device_tracker_position"
         )
 
     def _position(self) -> dict[str, Any]:
-        """Return the position dict from the vehicle, or empty dict."""
-        return getattr(self._vehicle, _POSITION_ATTR_KEY, None) or {}
+        """Return the position dict from vehicle state, or empty dict."""
+        return self._vehicle.state.get("position") or {}
 
     @property
     def latitude(self) -> float | None:
