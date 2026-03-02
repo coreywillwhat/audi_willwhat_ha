@@ -320,7 +320,7 @@ SENSOR_DESCRIPTIONS: tuple[AudiSensorEntityDescription, ...] = (
         icon="mdi:battery-charging",
         native_unit_of_measurement=UnitOfTime.MINUTES,
         value_fn=lambda v: v.state.get("remainingChargingTime", 0),
-        supported_fn=lambda v: v.state.get("carType") in ("hybrid", "electric"),
+        supported_fn=lambda v: v.state.get("carType") in ("hybrid", "electric", None),
     ),
     AudiSensorEntityDescription(
         key="target_state_of_charge",
@@ -484,7 +484,10 @@ async def async_setup_entry(
                 entities.append(AudiSensor(coordinator, description, vehicle))
 
         # Charging complete time — stateful sensor, separate class
-        if vehicle.state.get("carType") in ("hybrid", "electric"):
+        # carType may not be populated on the first refresh; treat None as
+        # "possibly EV" so the entity is registered.  native_value already
+        # returns None when carType turns out to be non-EV.
+        if vehicle.state.get("carType") in ("hybrid", "electric", None):
             entities.append(AudiChargingCompleteSensor(coordinator, vehicle))
 
     # Account-level API rate limit sensor, attached to the first vehicle.
