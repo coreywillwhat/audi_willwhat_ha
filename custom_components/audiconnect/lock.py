@@ -10,13 +10,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import AudiRuntimeData
-from .audi_entity import AudiEntity, is_entity_supported
+from .audi_entity import AudiEntity, compute_doors_trunk_status
 from .coordinator import AudiDataUpdateCoordinator
-
-# Lock uses attr_key="lock" which maps to the lock_supported property on the
-# vehicle.  State is derived from doors_trunk_status (matching the legacy
-# Lock instrument exactly).
-_LOCK_ATTR_KEY = "lock"
 
 
 async def async_setup_entry(
@@ -25,11 +20,15 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     runtime_data: AudiRuntimeData = config_entry.runtime_data
-    entities = [
-        AudiLock(runtime_data.coordinator, config_vehicle.vehicle)
-        for config_vehicle in runtime_data.account.config_vehicles
-        if is_entity_supported(config_vehicle.vehicle, _LOCK_ATTR_KEY)
-    ]
+    entities: list[LockEntity] = []
+    for config_vehicle in runtime_data.account.config_vehicles:
+        vehicle = config_vehicle.vehicle
+        # Lock requires door/trunk field data AND a SPIN PIN to be configured.
+        if (
+            compute_doors_trunk_status(vehicle) is not None
+            and runtime_data.account.connection._audi_service._spin is not None
+        ):
+            entities.append(AudiLock(runtime_data.coordinator, vehicle))
     async_add_entities(entities)
 
 
@@ -44,13 +43,11 @@ class AudiLock(AudiEntity, LockEntity):
         vehicle: Any,
     ) -> None:
         super().__init__(coordinator, vehicle)
-        self._attr_unique_id = (
-            f"{vehicle.vin.lower()}_lock_{_LOCK_ATTR_KEY}"
-        )
+        self._attr_unique_id = f"{vehicle.vin.lower()}_lock_lock"
 
     @property
     def is_locked(self) -> bool:
-        return self._vehicle.doors_trunk_status == "Locked"
+        return compute_doors_trunk_status(self._vehicle) == "Locked"
 
     async def async_lock(self, **kwargs: Any) -> None:
         connection = self.coordinator.account.connection

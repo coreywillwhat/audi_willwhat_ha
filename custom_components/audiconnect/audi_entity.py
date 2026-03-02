@@ -1,3 +1,5 @@
+"""Base entity for Audi Connect."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -8,19 +10,47 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN
 from .coordinator import AudiDataUpdateCoordinator
 
+# ---------------------------------------------------------------------------
+# Shared field-key tuples used by both sensor.py and lock.py
+# ---------------------------------------------------------------------------
+_DOOR_OPEN_KEYS = (
+    "OPEN_STATE_LEFT_FRONT_DOOR",
+    "OPEN_STATE_LEFT_REAR_DOOR",
+    "OPEN_STATE_RIGHT_FRONT_DOOR",
+    "OPEN_STATE_RIGHT_REAR_DOOR",
+)
+_DOOR_LOCK_KEYS = (
+    "LOCK_STATE_LEFT_FRONT_DOOR",
+    "LOCK_STATE_LEFT_REAR_DOOR",
+    "LOCK_STATE_RIGHT_FRONT_DOOR",
+    "LOCK_STATE_RIGHT_REAR_DOOR",
+)
 
-def is_entity_supported(vehicle: Any, attr_key: str) -> bool:
-    """Check if a vehicle supports a given entity attribute.
 
-    Mirrors the legacy Instrument.is_supported logic exactly:
-    1. If a ``{attr_key}_supported`` property exists, return its truthiness.
-    2. Otherwise, if the vehicle object has an ``attr_key`` attribute, return True.
-    3. Otherwise, return False.
+def compute_doors_trunk_status(vehicle: Any) -> str | None:
+    """Compute aggregate doors/trunk status from vehicle fields.
+
+    Returns "Open", "Closed", "Locked", or None if data is missing.
     """
-    supported_attr = f"{attr_key}_supported"
-    if hasattr(vehicle, supported_attr):
-        return bool(getattr(vehicle, supported_attr))
-    return hasattr(vehicle, attr_key)
+    fields = vehicle.fields
+    door_open_vals = [fields.get(k) for k in _DOOR_OPEN_KEYS]
+    door_lock_vals = [fields.get(k) for k in _DOOR_LOCK_KEYS]
+    trunk_open = fields.get("OPEN_STATE_TRUNK_LID")
+    trunk_lock = fields.get("LOCK_STATE_TRUNK_LID")
+
+    if (
+        not all(v is not None for v in door_open_vals)
+        or not all(v is not None for v in door_lock_vals)
+        or trunk_open is None
+        or trunk_lock is None
+    ):
+        return None
+
+    if any(v != "3" for v in door_open_vals) or trunk_open != "3":
+        return "Open"
+    if any(v != "2" for v in door_lock_vals) or trunk_lock != "2":
+        return "Closed"
+    return "Locked"
 
 
 class AudiEntity(CoordinatorEntity[AudiDataUpdateCoordinator]):
@@ -47,4 +77,4 @@ class AudiEntity(CoordinatorEntity[AudiDataUpdateCoordinator]):
         )
 
 
-__all__ = ["AudiEntity", "is_entity_supported"]
+__all__ = ["AudiEntity", "compute_doors_trunk_status"]
